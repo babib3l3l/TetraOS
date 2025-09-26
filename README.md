@@ -1,2 +1,3 @@
 # TetraOS
-My first os
+My first os, made by the that one day i can use it to replace windows (cause i dont like windows) 
+my project is for compiled 64x86 CPU and it run on 32x architecture. You can try to compile it to arm64 if you want to test but is not recommanded...
