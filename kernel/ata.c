@@ -21,6 +21,15 @@
 static void io_wait() {
     for (int i = 0; i < 4; ++i) inb(0x80);
 }
+static int wait_drq(int timeout) {
+    while (--timeout) {
+        uint8_t status = inb(ATA_STATUS);
+        if (status & ATA_ERR) return -1;   // erreur
+        if ((status & (ATA_BSY | ATA_DRQ)) == ATA_DRQ)
+            return 0; // DRQ prêt et BSY clear
+    }
+    return -1; // timeout
+}
 
 static int wait_bsy_clear(int timeout) {
     while (--timeout) {
@@ -70,7 +79,7 @@ void ata_init(void) {
     io_wait();
 
     // Attend que le disque soit prêt
-    int timeout = 1000000;
+    int timeout = 10000000;
     while (--timeout) {
         status = inb(ATA_STATUS);
         if (status & ATA_ERR) {
@@ -87,7 +96,6 @@ void ata_init(void) {
 
     // Si on arrive ici, le disque a répondu!
     print_string("ATA: disque detecte et identifie!\n");
-
     // Lecture des données d'identification (512 bytes)
     for (int i = 0; i < 256; i++) {
         uint16_t data = inw(ATA_DATA);
@@ -104,7 +112,7 @@ int ata_read_single(uint32_t lba, uint8_t* buffer) {
     io_wait();
 
     if (wait_bsy_clear(100000) != 0) { print_string("ATA: busy after select\n"); return -1; }
-
+    if (wait_drq(100000) != 0) { print_string("ATA : DRQ error !\n"); return -1;}
     outb(ATA_SECT_COUNT, 1);
     outb(ATA_LBA_LOW,  (uint8_t)(lba & 0xFF));
     outb(ATA_LBA_MID,  (uint8_t)((lba >> 8) & 0xFF));
@@ -133,6 +141,7 @@ int ata_write_single(uint32_t lba, const uint8_t* buffer) {
     io_wait();
 
     if (wait_bsy_clear(100000) != 0) { print_string("ATA: busy after select\n"); return -1; }
+    if (wait_drq(100000) != 0) { print_string("ATA : DRQ error !\n"); return -1;}
 
     outb(ATA_SECT_COUNT, 1);
     outb(ATA_LBA_LOW,  lba & 0xFF);
@@ -147,6 +156,7 @@ int ata_write_single(uint32_t lba, const uint8_t* buffer) {
         if (!(status & ATA_BSY) && (status & ATA_DRQ)) break;
     }
     if (timeout == 0) { print_string("ATA timeout (write DRQ)\n"); return -1; }
+    if (wait_drq(100000) != 0) { print_string("ATA : DRQ error !\n"); return -1;}
 
     for (int i = 0; i < 256; i++) {
         uint16_t data = (buffer[i * 2 + 1] << 8) | buffer[i * 2];
@@ -172,6 +182,7 @@ int ata_write_single(uint32_t lba, const uint8_t* buffer) {
 int ata_read(uint32_t lba, uint8_t* buffer, uint32_t count) {
     for (uint32_t i = 0; i < count; i++) {
         int r = ata_read_single(lba + i, buffer + i * 512);
+        if (wait_drq(100000) != 0) { print_string("ATA : DRQ error !\n"); return -1;}
         if (r != 0) return r;
     }
     return 0;
@@ -180,6 +191,7 @@ int ata_read(uint32_t lba, uint8_t* buffer, uint32_t count) {
 int ata_write(uint32_t lba, const uint8_t* buffer, uint32_t count) {
     for (uint32_t i = 0; i < count; i++) {
         int r = ata_write_single(lba + i, buffer + i * 512);
+        if (wait_drq(100000) != 0) { print_string("ATA : DRQ error !\n"); return -1;}
         if (r != 0) return r;
     }
     return 0;

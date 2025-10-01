@@ -1,2 +1,4 @@
 /i686
 /kernel/.vscode
+/kernel/ata.txt
+/kernel/fs.txt

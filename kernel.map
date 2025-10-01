@@ -1,0 +1,283 @@
+
+Discarded input sections
+
+ .comment       0x00000000       0x13 kernel\main.o
+ .comment       0x00000000       0x13 kernel\input.o
+ .comment       0x00000000       0x13 kernel\fs.o
+ .comment       0x00000000       0x13 kernel\screen.o
+ .comment       0x00000000       0x13 kernel\utils.o
+ .comment       0x00000000       0x13 kernel\ata.o
+ .comment       0x00000000       0x13 kernel\boot_info.o
+ .comment       0x00000000       0x13 kernel\mem_boot.o
+ .comment       0x00000000       0x13 kernel\src\mem\pfa.o
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+ram              0x00010000         0x04000000         xrw
+*default*        0x00000000         0xffffffff
+
+Linker script and memory map
+
+                0x00010000                        . = 0x10000
+
+.text.start     0x00010000       0x20
+ *(.text.start)
+ .text.start    0x00010000       0x20 kernel\main.o
+                0x00010000                start
+
+.text           0x00010020     0x4377
+ *(.text)
+ .text          0x00010020      0xcd9 kernel\main.o
+                0x00010041                kmain
+                0x0001026e                draw_editor_window
+                0x00010493                windowed_write
+                0x000106bb                tetra_shell
+ .text          0x00010cf9      0x304 kernel\input.o
+                0x00010cf9                keyboard_read_scancode
+                0x00010d1a                handle_input
+                0x00010e59                get_input_char
+                0x00010f14                keyboard_get_char
+ .text          0x00010ffd     0x1a9c kernel\fs.o
+                0x000113da                fs_flush
+                0x0001167b                fs_format
+                0x0001194d                fs_init
+                0x00011ab4                fs_find_in_dir
+                0x00011b5b                fs_find
+                0x00011b77                fs_next_free_lba
+                0x00011c01                fs_read_file
+                0x00011f4f                fs_write_file
+                0x0001239c                fs_mkdir
+                0x000123b4                fs_add
+                0x000123cc                fs_cd
+                0x00012495                fs_pwd
+                0x0001259a                fs_ls
+                0x0001274c                fs_delete
+                0x00012958                fs_tree
+                0x00012970                fs_list
+ .text          0x00012a99      0x68f kernel\screen.o
+                0x00012ab8                get_offset
+                0x00012ad3                scroll_if_needed
+                0x00012bc3                print_char
+                0x00012ced                print_int
+                0x00012daa                print_string
+                0x00012ddb                clear_screen
+                0x00012e33                update_cursor
+                0x00012ea6                set_cursor
+                0x00012ec1                print_hex
+                0x00012f28                print_dec
+                0x00012fbf                draw_box
+                0x000130be                clear_area
+ .text          0x00013128      0x668 kernel\utils.o
+                0x00013128                memcpy
+                0x00013165                memset
+                0x00013193                memcmp
+                0x000131eb                strcmp
+                0x0001322a                strncmp
+                0x000132a4                strcpy
+                0x000132de                strncpy
+                0x0001333b                strlen
+                0x00013362                strcat
+                0x00013551                snprintf
+                0x000136e5                strcasecmp
+ .text          0x00013790      0x994 kernel\ata.o
+                0x000138be                ata_init
+                0x00013bf5                ata_read_single
+                0x00013db9                ata_write_single
+                0x0001402a                ata_read
+                0x000140a7                ata_write
+ .text          0x00014124       0x37 kernel\boot_info.o
+                0x00014124                bootinfo_try_init
+ .text          0x0001415b       0x1a kernel\mem_boot.o
+                0x0001415b                mem_boot_init
+ .text          0x00014175      0x222 kernel\src\mem\pfa.o
+                0x00014222                pfa_init
+                0x000142c6                pfa_alloc_frame
+                0x00014315                pfa_free_frame
+                0x00014351                pfa_total_frames
+                0x0001435b                pfa_free_frames
+
+.iplt           0x00014397        0x0
+ .iplt          0x00014397        0x0 kernel\main.o
+
+.rodata         0x00014398     0x1196
+ *(.rodata*)
+ .rodata        0x00014398      0x675 kernel\main.o
+                0x00014398                boot_msg
+ .rodata        0x00014a0d        0xc kernel\input.o
+ *fill*         0x00014a19        0x3 
+ .rodata        0x00014a1c      0x8f4 kernel\fs.o
+ .rodata        0x00015310        0x3 kernel\screen.o
+ .rodata        0x00015313       0x11 kernel\utils.o
+ .rodata        0x00015324      0x20a kernel\ata.o
+
+.rel.dyn        0x00015530        0x0
+ .rel.got       0x00015530        0x0 kernel\main.o
+ .rel.iplt      0x00015530        0x0 kernel\main.o
+
+.data           0x00015540      0x200
+ *(.data)
+ .data          0x00015540        0x0 kernel\main.o
+ .data          0x00015540      0x200 kernel\input.o
+                0x00015540                keyboard_map
+                0x00015640                keyboard_map_shift
+ .data          0x00015740        0x0 kernel\fs.o
+ .data          0x00015740        0x0 kernel\screen.o
+ .data          0x00015740        0x0 kernel\utils.o
+ .data          0x00015740        0x0 kernel\ata.o
+ .data          0x00015740        0x0 kernel\boot_info.o
+ .data          0x00015740        0x0 kernel\mem_boot.o
+ .data          0x00015740        0x0 kernel\src\mem\pfa.o
+
+.got            0x00015740        0x0
+ .got           0x00015740        0x0 kernel\main.o
+
+.got.plt        0x00015740        0x0
+ .got.plt       0x00015740        0x0 kernel\main.o
+
+.igot.plt       0x00015740        0x0
+ .igot.plt      0x00015740        0x0 kernel\main.o
+
+.bss            0x00015740   0x417c80
+ *(.bss)
+ .bss           0x00015740        0x0 kernel\main.o
+ .bss           0x00015740      0x20c kernel\input.o
+                0x00015740                input_buffer
+                0x00015940                input_index
+                0x00015944                shift_pressed
+                0x00015948                ctrl_pressed
+ *fill*         0x0001594c       0x14 
+ .bss           0x00015960   0x317a20 kernel\fs.o
+                0x00015960                g_fs
+                0x0001d168                g_cwd
+ .bss           0x0032d380        0x8 kernel\screen.o
+                0x0032d380                cursor_row
+                0x0032d384                cursor_col
+ .bss           0x0032d388        0x0 kernel\utils.o
+ .bss           0x0032d388        0x0 kernel\ata.o
+ .bss           0x0032d388        0x0 kernel\boot_info.o
+ .bss           0x0032d388        0x0 kernel\mem_boot.o
+ *fill*         0x0032d388       0x18 
+ .bss           0x0032d3a0   0x100020 kernel\src\mem\pfa.o
+                0x00010000                        _kernel_start = ADDR (.text.start)
+                0x0042d3c0                        _kernel_end = .
+
+/DISCARD/
+ *(.comment)
+ *(.note)
+ *(.eh_frame)
+LOAD kernel\main.o
+LOAD kernel\input.o
+LOAD kernel\fs.o
+LOAD kernel\screen.o
+LOAD kernel\utils.o
+LOAD kernel\ata.o
+LOAD kernel\boot_info.o
+LOAD kernel\mem_boot.o
+LOAD kernel\src\mem\pfa.o
+OUTPUT(kernel.elf elf32-i386)
+
+.debug_info     0x00000000     0x2e1a
+ .debug_info    0x00000000      0x900 kernel\main.o
+ .debug_info    0x00000900      0x234 kernel\input.o
+ .debug_info    0x00000b34      0xebf kernel\fs.o
+ .debug_info    0x000019f3      0x4f7 kernel\screen.o
+ .debug_info    0x00001eea      0x598 kernel\utils.o
+ .debug_info    0x00002482      0x51e kernel\ata.o
+ .debug_info    0x000029a0      0x117 kernel\boot_info.o
+ .debug_info    0x00002ab7       0xd7 kernel\mem_boot.o
+ .debug_info    0x00002b8e      0x28c kernel\src\mem\pfa.o
+
+.debug_abbrev   0x00000000      0xd34
+ .debug_abbrev  0x00000000      0x267 kernel\main.o
+ .debug_abbrev  0x00000267      0x11e kernel\input.o
+ .debug_abbrev  0x00000385      0x2da kernel\fs.o
+ .debug_abbrev  0x0000065f      0x16a kernel\screen.o
+ .debug_abbrev  0x000007c9      0x144 kernel\utils.o
+ .debug_abbrev  0x0000090d      0x18f kernel\ata.o
+ .debug_abbrev  0x00000a9c       0xac kernel\boot_info.o
+ .debug_abbrev  0x00000b48       0x81 kernel\mem_boot.o
+ .debug_abbrev  0x00000bc9      0x16b kernel\src\mem\pfa.o
+
+.debug_aranges  0x00000000      0x128
+ .debug_aranges
+                0x00000000       0x28 kernel\main.o
+ .debug_aranges
+                0x00000028       0x20 kernel\input.o
+ .debug_aranges
+                0x00000048       0x20 kernel\fs.o
+ .debug_aranges
+                0x00000068       0x20 kernel\screen.o
+ .debug_aranges
+                0x00000088       0x20 kernel\utils.o
+ .debug_aranges
+                0x000000a8       0x20 kernel\ata.o
+ .debug_aranges
+                0x000000c8       0x20 kernel\boot_info.o
+ .debug_aranges
+                0x000000e8       0x20 kernel\mem_boot.o
+ .debug_aranges
+                0x00000108       0x20 kernel\src\mem\pfa.o
+
+.debug_rnglists
+                0x00000000       0x65
+ .debug_rnglists
+                0x00000000       0x38 kernel\main.o
+ .debug_rnglists
+                0x00000038       0x2d kernel\ata.o
+
+.debug_line     0x00000000     0x2273
+ .debug_line    0x00000000      0x5e9 kernel\main.o
+ .debug_line    0x000005e9      0x279 kernel\input.o
+ .debug_line    0x00000862      0xa1c kernel\fs.o
+ .debug_line    0x0000127e      0x3d3 kernel\screen.o
+ .debug_line    0x00001651      0x542 kernel\utils.o
+ .debug_line    0x00001b93      0x47f kernel\ata.o
+ .debug_line    0x00002012       0x79 kernel\boot_info.o
+ .debug_line    0x0000208b       0x67 kernel\mem_boot.o
+ .debug_line    0x000020f2      0x181 kernel\src\mem\pfa.o
+
+.debug_str      0x00000000      0x882
+ .debug_str     0x00000000      0x882 kernel\main.o
+                                0x366 (size before relaxing)
+ .debug_str     0x00000882      0x1a2 kernel\input.o
+ .debug_str     0x00000882      0x4dd kernel\fs.o
+ .debug_str     0x00000882      0x1ac kernel\screen.o
+ .debug_str     0x00000882      0x198 kernel\utils.o
+ .debug_str     0x00000882      0x1c9 kernel\ata.o
+ .debug_str     0x00000882      0x140 kernel\boot_info.o
+ .debug_str     0x00000882      0x118 kernel\mem_boot.o
+ .debug_str     0x00000882      0x1cf kernel\src\mem\pfa.o
+
+.debug_line_str
+                0x00000000      0x178
+ .debug_line_str
+                0x00000000      0x178 kernel\main.o
+                                 0xde (size before relaxing)
+ .debug_line_str
+                0x00000178       0x69 kernel\input.o
+ .debug_line_str
+                0x00000178       0xcb kernel\fs.o
+ .debug_line_str
+                0x00000178       0xbb kernel\screen.o
+ .debug_line_str
+                0x00000178       0xc1 kernel\utils.o
+ .debug_line_str
+                0x00000178       0xb7 kernel\ata.o
+ .debug_line_str
+                0x00000178       0xdb kernel\boot_info.o
+ .debug_line_str
+                0x00000178       0xd6 kernel\mem_boot.o
+ .debug_line_str
+                0x00000178       0xd1 kernel\src\mem\pfa.o
+
+.debug_frame    0x00000000      0xb48
+ .debug_frame   0x00000000      0x124 kernel\main.o
+ .debug_frame   0x00000124       0x8c kernel\input.o
+ .debug_frame   0x000001b0      0x318 kernel\fs.o
+ .debug_frame   0x000004c8      0x1b4 kernel\screen.o
+ .debug_frame   0x0000067c      0x1b4 kernel\utils.o
+ .debug_frame   0x00000830      0x194 kernel\ata.o
+ .debug_frame   0x000009c4       0x34 kernel\boot_info.o
+ .debug_frame   0x000009f8       0x34 kernel\mem_boot.o
+ .debug_frame   0x00000a2c      0x11c kernel\src\mem\pfa.o
