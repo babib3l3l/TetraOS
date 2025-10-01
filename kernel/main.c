@@ -304,6 +304,10 @@ void tetra_shell(void)
             print_string("  exit            - Exit the shell\n");
 
         }
+        else if (strcmp(s, "formate") == 0){
+            fs_format();
+        }
+
         else if (strcmp(s, "exit") == 0) {
             outw(0x604, 0x2000);
         }

@@ -138,7 +138,6 @@ int fs_flush(void) {
     return 0;
 }
 
-// --- flush node (écrit uniquement les secteurs contenant le node) ---
 static int fs_flush_node(uint32_t node_idx) {
     if (node_idx >= g_fs.node_count) {
         print_string("FS: fs_flush_node invalid idx\n");
@@ -148,35 +147,46 @@ static int fs_flush_node(uint32_t node_idx) {
     uint8_t* base = (uint8_t*)&g_fs;
     uint8_t* nodeptr = (uint8_t*)&g_fs.nodes[node_idx];
     ptrdiff_t offset = nodeptr - base;
-    if (offset < 0) { print_string("FS: unexpected node offset\n"); return -1; }
 
-    size_t node_size = sizeof(g_fs.nodes[0]);
-    uint32_t start_sector = (uint32_t)(offset / 512);
-    uint32_t end_sector = (uint32_t)((offset + node_size + 511) / 512);
-    uint32_t sectors = end_sector - start_sector;
-    if (sectors == 0) return 0;
-    if (start_sector + sectors > FS_TABLE_SECTORS) {
-        print_string("FS: fs_flush_node out of bounds\n");
+    if (offset < 0) {
+        print_string("FS: unexpected node offset\n");
         return -1;
     }
 
-    uint32_t bytes = sectors * 512;
-    memset(fs_temp_buffer, 0, bytes);
-    memcpy(fs_temp_buffer, base + start_sector * 512, bytes);
+    // Localiser le secteur de la table contenant ce node
+    uint32_t start_sector = (uint32_t)(offset / 512);
+    uint32_t lba = FS_TABLE_LBA + start_sector;
 
-    print_string("FS: fs_flush_node idx=");
-    print_dec(node_idx);
-    print_string(" start_sector=");
-    print_dec(start_sector);
-    print_string(" sectors=");
-    print_dec(sectors);
-    print_string("\n");
+    // Lire le secteur actuel depuis le disque
+    uint8_t sector[512];
+    if (ata_read(lba, sector, 1) != 0) {
+        print_string("FS: fs_flush_node read failed\n");
+        return -1;
+    }
 
-    int r = write_sectors(FS_TABLE_LBA + start_sector, fs_temp_buffer, sectors);
-    if (r != 0) {
+    // Mettre à jour uniquement la portion correspondant au node
+    size_t node_size = sizeof(g_fs.nodes[0]);
+    uint32_t node_offset_in_sector = (uint32_t)(offset % 512);
+
+    if (node_offset_in_sector + node_size > 512) {
+        print_string("FS: node chevauche plusieurs secteurs (non supporté)\n");
+        return -1;
+    }
+
+    memcpy(sector + node_offset_in_sector, nodeptr, node_size);
+
+    // Réécrire le secteur complet sur disque
+    if (ata_write(lba, sector, 1) != 0) {
         print_string("FS: fs_flush_node write failed\n");
         return -1;
     }
+
+    print_string("FS: fs_flush_node idx=");
+    print_dec(node_idx);
+    print_string(" LBA=");
+    print_dec(lba);
+    print_string(" updated OK\n");
+
     return 0;
 }
 
@@ -196,7 +206,6 @@ void fs_format(void) {
     root->magic = FS_MAGIC;
     root->data_start_lba = FS_DATA_BASE_LBA;
 
-    // Ecrire 1 secteur test
     uint8_t header_sector[512];
     memset(header_sector, 0, 512);
     uint32_t copy_len = sizeof(FSTable) < 512 ? sizeof(FSTable) : 512;
@@ -210,7 +219,7 @@ void fs_format(void) {
     }
     print_string("OK\n");
 
-    // Ecriture complète de la zone (par batches) pour zero-ing and reserving space
+     
     print_string("FS: Writing full table area (this may take a while)...\n");
     uint32_t total = FS_TABLE_SECTORS;
     uint32_t written = 0;
