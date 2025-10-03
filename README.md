@@ -4,7 +4,6 @@ my project is for compiled 64x86 CPU and it run on 32x architecture. You can try
 
 # Compilation
 To compile my OS, you need to have i686, there is the link to download it precompilated : [PreCompilated i686](https://github.com/lordmilko/i686-elf-tools/releases)
-
 Juste take the i686 not the 86x64, it's important !
-
+Once you have dezip i686-elf-tools-windows.zip, rename the directory **i686**.
 The other tool of the toolchain is inclued with the project
