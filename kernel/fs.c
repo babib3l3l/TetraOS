@@ -728,3 +728,89 @@ void fs_list(void) {
         print_string("\n");
     }
 }
+
+/* --- CWD and helper functions adapted to modern FS API --- */
+static char g_cwd_path[256] = "/";
+
+/* build absolute path from cwd and name */
+static void build_path(const char *name, char *out, size_t out_sz) {
+    if (!name || name[0] == '\0') { strncpy(out, g_cwd_path, out_sz-1); out[out_sz-1]='\0'; return; }
+    if (name[0] == '/') { strncpy(out, name, out_sz-1); out[out_sz-1] = '\0'; return; }
+    if (strcmp(g_cwd_path, "/") == 0) snprintf(out, out_sz, "/%s", name);
+    else snprintf(out, out_sz, "%s/%s", g_cwd_path, name);
+}
+
+/* change directory implementation: returns 0 on success */
+static int fs_cd_impl(const char *path) {
+    if (!path) return -1;
+    char candidate[512];
+    build_path(path, candidate, sizeof(candidate));
+    /* use fs_ls to test if directory exists */
+    char buf[1024];
+    int r = fs_ls(candidate, buf, sizeof(buf));
+    if (r == FS_OK) {
+        size_t L = strlen(candidate);
+        while (L > 1 && candidate[L-1] == '/') { candidate[L-1] = '\0'; L--; }
+        strncpy(g_cwd_path, candidate, sizeof(g_cwd_path)-1); g_cwd_path[sizeof(g_cwd_path)-1]='\0';
+        return 0;
+    }
+    return -1;
+}
+
+/* find in cwd using fs_ls output; returns 1 if found, 0 otherwise */
+static int fs_find_impl(const char *name) {
+    if (!name) return 0;
+    char buf[4096];
+    if (fs_ls(g_cwd_path, buf, sizeof(buf)) != FS_OK) return 0;
+    char *p = buf;
+    while (*p) {
+        char entry[256]; int i=0;
+        while (*p && *p != '\n' && i < (int)sizeof(entry)-1) entry[i++] = *p++;
+        entry[i]='\0';
+        if (*p == '\n') p++;
+        char *tab = strchr(entry, '\t');
+        if (tab) *tab = '\0';
+        if (strcmp(entry, name) == 0) return 1;
+    }
+    return 0;
+}
+
+/* read/write helpers for shell */
+static int fs_write_file_impl(const char* name, const uint8_t* data, uint32_t size) {
+    if (!name) return -1;
+    char path[512]; build_path(name, path, sizeof(path));
+    fs_create(path); /* create if not exists */
+    fs_fd_t fd = fs_open(path, 1);
+    if (fd < 0) return -1;
+    int w = fs_write(fd, data, size);
+    fs_close(fd);
+    return (w >= 0) ? 0 : -1;
+}
+
+static int fs_read_file_impl(const char* name, uint8_t* out, uint32_t max_len) {
+    if (!name || !out) return -1;
+    char path[512]; build_path(name, path, sizeof(path));
+    fs_fd_t fd = fs_open(path, 0);
+    if (fd < 0) return -1;
+    int r = fs_read(fd, out, max_len);
+    fs_close(fd);
+    return r;
+}
+
+static int fs_delete_impl(const char* name) {
+    if (!name) return -1;
+    char path[512]; build_path(name, path, sizeof(path));
+    return (fs_remove(path) == FS_OK) ? 0 : -1;
+}
+
+static void fs_list_impl(void) {
+    char buf[4096];
+    fs_ls(g_cwd_path, buf, sizeof(buf));
+    printf("%s", buf);
+}
+
+static int fs_mkdir_wrapper(const char* name) {
+    if (!name) return -1;
+    char path[512]; build_path(name, path, sizeof(path));
+    return (fs_mkdir(path) == FS_OK) ? 0 : -1;
+}

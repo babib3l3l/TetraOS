@@ -325,11 +325,9 @@ void tetra_shell(void)
         print_string("root@TetraOS:");
         
         // Afficher le chemin actuel
-        // old FSTable removed
-        // old g_cwd removed
         char parts[16][32];
         int depth = 0;
-        uint32_t cur = g_cwd;
+        uint32_t cur = g_cwd_path;
         
         while (cur != 0 && depth < 16) {
             memset(parts[depth], 0, 32);
