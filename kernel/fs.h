@@ -1,88 +1,57 @@
-/*
- * fs.h - Interface du système de fichiers en mémoire pour TetraOS
- *
- * Fournit une API simple pour gérer un système de fichiers hiérarchique
- * en RAM, avec des dossiers et des fichiers (inspiré d’APFS, version simplifiée).
- *
- * Auteur : adapté pour TetraOS
- */
-
 #ifndef FS_H
 #define FS_H
 
+#include <stdint.h>
 #include <stddef.h>
 
-/* ------------------------------------------------------------------
- * Constantes
- * ------------------------------------------------------------------ */
-#define FS_MAX_NAME     64      // Longueur max d'un nom de fichier/dossier
-#define FS_MAX_OPEN_FD  32      // Nombre max de fichiers ouverts simultanément
+/* Codes d'erreur du système de fichiers */
+#define FS_OK              0
+#define FS_ERR_NOTFOUND   -1
+#define FS_ERR_EXISTS     -2
+#define FS_ERR_NOSPACE    -3
+#define FS_ERR_IO         -4
+#define FS_ERR_BADARG     -5
+#define FS_ERR_ISDIR      -6
+#define FS_ERR_NOTDIR     -7
 
-/* ------------------------------------------------------------------
- * Codes d'erreur
- * ------------------------------------------------------------------ */
-#define FS_OK            0
-#define FS_ERR_NOMEM    -1   // Mémoire insuffisante
-#define FS_ERR_NOTFOUND -2   // Fichier/dossier introuvable
-#define FS_ERR_EXISTS   -3   // Fichier/dossier déjà existant
-#define FS_ERR_NOTDIR   -4   // Attendu un dossier mais trouvé un fichier
-#define FS_ERR_ISDIR    -5   // Attendu un fichier mais trouvé un dossier
-#define FS_ERR_BADFD    -6   // Descripteur invalide
-#define FS_ERR_IO       -7   // Erreur d'entrée/sortie
-#define FS_ERR_NOFD     -8   // Trop de fichiers ouverts
-#define FS_ERR_BADARG   -9   // Argument invalide
+/* Type d'identifiant de fichier (descripteur) */
+typedef int fs_fd_t;
 
-/* ------------------------------------------------------------------
- * Types
- * ------------------------------------------------------------------ */
-typedef enum {
-    FS_NODE_FILE,
-    FS_NODE_DIR
-} fs_node_type_t;
-
+/* Structure de base d'un nœud du FS (fichier ou dossier) */
 struct fs_node {
-    char name[FS_MAX_NAME];     // Nom du fichier/dossier
-    fs_node_type_t type;        // Type (fichier ou dossier)
-    struct fs_node *parent;     // Dossier parent
-    struct fs_node *children;   // Liste chaînée des enfants (si dossier)
-    struct fs_node *next;       // Sibling suivant
-    char *data;                 // Contenu (si fichier)
-    size_t size;                // Taille du contenu
+    char name[64];
+    uint8_t is_dir;
+    uint8_t *data;
+    size_t size;
+    struct fs_node *parent;
+    struct fs_node *children;
+    struct fs_node *next;
 };
 
-typedef struct {
-    struct fs_node *node;       // Pointeur vers le fichier ouvert
-    size_t pos;                 // Position courante (pour read/write)
-    int used;                   // 0 = libre, 1 = utilisé
-} fs_fd_t;
+/* Initialisation du FS (en RAM pour le moment) */
+int fs_init(void);
 
-/* ------------------------------------------------------------------
- * API publique
- * ------------------------------------------------------------------ */
-
-// Initialisation
-void fs_init(void);
-
-// Création
-int fs_create(const char *path);
+/* Création de dossier ou fichier */
 int fs_mkdir(const char *path);
+int fs_create(const char *path);
 
-// Compatibilité : alias de fs_create()
-#define fs_add(path) fs_create(path)
+/* Ouverture, lecture, écriture et fermeture */
+fs_fd_t fs_open(const char *path, int write_mode);
+int fs_read(fs_fd_t fd, void *buf, size_t size);
+int fs_write(fs_fd_t fd, const void *buf, size_t size);
+int fs_close(fs_fd_t fd);
 
-// Gestion fichiers
-int fs_open(const char *path);
-int fs_close(int fd);
-int fs_write(int fd, const char *buf, size_t len);
-int fs_read(int fd, char *buf, size_t len);
-
-// Suppression
+/* Suppression */
 int fs_remove(const char *path);
 
-// Liste d’un répertoire (remplit buffer avec les noms)
+/* Liste le contenu d’un dossier dans 'out' */
 int fs_ls(const char *path, char *out, size_t out_size);
 
-// Debug
+/* Fonction de debug : affiche l’arborescence complète */
 void fs_debug_print(void);
 
-#endif // FS_H
+/* Fonctions utilitaires pour introspection */
+const char *fs_get_cwd(void);
+int fs_set_cwd(const char *path);
+
+#endif

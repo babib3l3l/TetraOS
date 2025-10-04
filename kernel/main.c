@@ -6,6 +6,93 @@
 #include "io.h"
 #include "ata.h"
 
+/* --- CWD and helper functions adapted to modern FS API --- */
+static char g_cwd_path[256] = "/";
+
+/* build absolute path from cwd and name */
+static void build_path(const char *name, char *out, size_t out_sz) {
+    if (!name || name[0] == '\0') { strncpy(out, g_cwd_path, out_sz-1); out[out_sz-1]='\0'; return; }
+    if (name[0] == '/') { strncpy(out, name, out_sz-1); out[out_sz-1] = '\0'; return; }
+    if (strcmp(g_cwd_path, "/") == 0) snprintf(out, out_sz, "/%s", name);
+    else snprintf(out, out_sz, "%s/%s", g_cwd_path, name);
+}
+
+/* change directory implementation: returns 0 on success */
+static int fs_cd_impl(const char *path) {
+    if (!path) return -1;
+    char candidate[512];
+    build_path(path, candidate, sizeof(candidate));
+    /* use fs_ls to test if directory exists */
+    char buf[1024];
+    int r = fs_ls(candidate, buf, sizeof(buf));
+    if (r == FS_OK) {
+        size_t L = strlen(candidate);
+        while (L > 1 && candidate[L-1] == '/') { candidate[L-1] = '\0'; L--; }
+        strncpy(g_cwd_path, candidate, sizeof(g_cwd_path)-1); g_cwd_path[sizeof(g_cwd_path)-1]='\0';
+        return 0;
+    }
+    return -1;
+}
+
+/* find in cwd using fs_ls output; returns 1 if found, 0 otherwise */
+static int fs_find_impl(const char *name) {
+    if (!name) return 0;
+    char buf[4096];
+    if (fs_ls(g_cwd_path, buf, sizeof(buf)) != FS_OK) return 0;
+    char *p = buf;
+    while (*p) {
+        char entry[256]; int i=0;
+        while (*p && *p != '\n' && i < (int)sizeof(entry)-1) entry[i++] = *p++;
+        entry[i]='\0';
+        if (*p == '\n') p++;
+        char *tab = strchr(entry, '\t');
+        if (tab) *tab = '\0';
+        if (strcmp(entry, name) == 0) return 1;
+    }
+    return 0;
+}
+
+/* read/write helpers for shell */
+static int fs_write_file_impl(const char* name, const uint8_t* data, uint32_t size) {
+    if (!name) return -1;
+    char path[512]; build_path(name, path, sizeof(path));
+    fs_create(path); /* create if not exists */
+    fs_fd_t fd = fs_open(path, 1);
+    if (fd < 0) return -1;
+    int w = fs_write(fd, data, size);
+    fs_close(fd);
+    return (w >= 0) ? 0 : -1;
+}
+
+static int fs_read_file_impl(const char* name, uint8_t* out, uint32_t max_len) {
+    if (!name || !out) return -1;
+    char path[512]; build_path(name, path, sizeof(path));
+    fs_fd_t fd = fs_open(path, 0);
+    if (fd < 0) return -1;
+    int r = fs_read(fd, out, max_len);
+    fs_close(fd);
+    return r;
+}
+
+static int fs_delete_impl(const char* name) {
+    if (!name) return -1;
+    char path[512]; build_path(name, path, sizeof(path));
+    return (fs_remove(path) == FS_OK) ? 0 : -1;
+}
+
+static void fs_list_impl(void) {
+    char buf[4096];
+    fs_ls(g_cwd_path, buf, sizeof(buf));
+    printf("%s", buf);
+}
+
+static int fs_mkdir_wrapper(const char* name) {
+    if (!name) return -1;
+    char path[512]; build_path(name, path, sizeof(path));
+    return (fs_mkdir(path) == FS_OK) ? 0 : -1;
+}
+
+
 
 __attribute__((naked)) __attribute__((section(".text.start")))
 void start(void) {
@@ -178,7 +265,7 @@ void windowed_write(const char* filename)
     
     // Essayer de lire le fichier existant
     uint8_t existing_data[1024];
-    int bytes_read = fs_read_file(filename, existing_data, sizeof(existing_data) - 1);
+    int bytes_read = fs_read_file_impl(filename, existing_data, sizeof(existing_data) - 1);
     if (bytes_read > 0) {
         existing_data[bytes_read] = '\0';
         strncpy(content, (char*)existing_data, sizeof(content) - 1);
@@ -191,7 +278,7 @@ void windowed_write(const char* filename)
         char c = keyboard_get_char();
         
         if (c == 27) { // ESC - Sauvegarder et quitter
-            fs_write_file(filename, (uint8_t*)content, strlen(content));
+            fs_write_file_impl(filename, (uint8_t*)content, strlen(content));
             break;
         }
         else if (c == 3) { // /*/*ctrl+c removed*/ removed*/ - Annuler
@@ -238,8 +325,8 @@ void tetra_shell(void)
         print_string("root@TetraOS:");
         
         // Afficher le chemin actuel
-        extern FSTable g_fs;
-        extern uint32_t g_cwd;
+        // old FSTable removed
+        // old g_cwd removed
         char parts[16][32];
         int depth = 0;
         uint32_t cur = g_cwd;
@@ -305,7 +392,7 @@ void tetra_shell(void)
 
         }
         else if (strcmp(s, "formate") == 0){
-            fs_format();
+            fs_init();
         }
 
         else if (strcmp(s, "exit") == 0) {
@@ -315,18 +402,18 @@ void tetra_shell(void)
             clear_screen();
         }
         else if (strcmp(s, "ls") == 0) {
-            fs_ls();
+            do { char __fsbuf[4096]; fs_ls(g_cwd_path, __fsbuf, sizeof(__fsbuf)); printf("%s", __fsbuf); } while(0);
         }
         else if (strcmp(s, "fs") == 0) {
-            fs_tree();
+            fs_debug_print();
         }
         else if (strcmp(s, "pwd") == 0) {
-            fs_pwd();
+            /* print cwd */ printf("%s\n", g_cwd_path);
         }
         else if (strncmp(s, "cd ", 3) == 0) {
             char *path = (char*)(s + 3);
             while (*path == ' ') path++;
-            if (fs_cd(path) != 0) {
+            if (fs_cd_impl(path) != 0) {
                 print_string("cd: directory not found\n");
             }
         }
@@ -340,7 +427,7 @@ void tetra_shell(void)
         else if (strncmp(s, "new ", 4) == 0) {
             char *name = (char*)(s + 4);
             while (*name == ' ') name++;
-            if (fs_add(name) != 0) {
+            if (fs_create(name) != 0) {
                 print_string("add: failed\n");
             }
         }
@@ -348,7 +435,7 @@ void tetra_shell(void)
             char *name = (char*)(s + 6);
             while (*name == ' ') name++;
             
-            int idx = fs_find(name);
+            int idx = fs_find_impl(name);
             if (idx < 0) {
                 print_string("File not found. Use 'add' to create it first.\n");
             } else {
@@ -360,7 +447,7 @@ void tetra_shell(void)
             while (*name == ' ') name++;
             
             uint8_t buffer[1024];
-            int result = fs_read_file(name, buffer, sizeof(buffer) - 1);
+            int result = fs_read_file_impl(name, buffer, sizeof(buffer) - 1);
             if (result > 0) {
                 buffer[result] = '\0';
                 print_string((char*)buffer);
