@@ -9,13 +9,10 @@
  * It's intentionally simple to be safe to integrate and easy to extend.
  */
 
-#include "reAPFS.h"
-#include "fs.h"
+#include "reapfs.h"
 #include "ata.h"
 #include "utils.h"
 #include "screen.h"
-#include <string.h>
-#include <stdio.h>
 
 /* Helpers to convert byte offsets to ATA LBAs (512-byte sectors) */
 static int disk_read_bytes(void *buf, uint64_t offset, size_t len) {

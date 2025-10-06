@@ -1,10 +1,18 @@
 #include "screen.h"
 #include "input.h"
-#include "fs.h"
+#include "reapfs.h"
 #include "utils.h"
 #include <stdint.h>
 #include "io.h"
 #include "ata.h"
+
+
+struct reapfs_global {
+    struct reapfs_super super;
+    struct reapfs_inode nodes[REAPFS_MAX_INODES];
+};
+
+static struct reapfs_global g_fs;
 
 /* --- CWD and helper functions adapted to modern FS API --- */
 static char g_cwd_path[256] = "/";
@@ -57,7 +65,7 @@ static int fs_write_file_impl(const char* name, const uint8_t* data, uint32_t si
     if (!name) return -1;
     char path[512]; build_path(name, path, sizeof(path));
     fs_create(path); /* create if not exists */
-    fs_fd_t fd = fs_open(path, 1);
+    reapfs_fd_t fd = fs_open(path, 1);
     if (fd < 0) return -1;
     int w = fs_write(fd, data, size);
     fs_close(fd);
@@ -67,7 +75,7 @@ static int fs_write_file_impl(const char* name, const uint8_t* data, uint32_t si
 static int fs_read_file_impl(const char* name, uint8_t* out, uint32_t max_len) {
     if (!name || !out) return -1;
     char path[512]; build_path(name, path, sizeof(path));
-    fs_fd_t fd = fs_open(path, 0);
+    reapfs_fd_t fd = fs_open(path, 0);
     if (fd < 0) return -1;
     int r = fs_read(fd, out, max_len);
     fs_close(fd);

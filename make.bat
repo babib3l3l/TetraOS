@@ -23,7 +23,7 @@ if errorlevel 1 goto error
 
 REM === COMPILATION DU KERNEL ===
 echo Compilation des fichiers du kernel...
-set FILES=main input fs screen utils ata boot_info mem_boot
+set FILES=main input reapfs screen utils ata boot_info mem_boot
 
 for %%f in (%FILES%) do (
     echo Compilation de kernel\%%f.c...
@@ -46,7 +46,7 @@ echo Linking du kernel...
 %LD% -T kernel\linker.ld -o kernel.elf -Map kernel.map ^
 kernel\main.o ^
 kernel\input.o ^
-kernel\fs.o ^
+kernel\reapfs.o ^
 kernel\screen.o ^
 kernel\utils.o ^
 kernel\ata.o ^

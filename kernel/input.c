@@ -1,5 +1,5 @@
 #include "screen.h"
-#include "fs.h"
+#include "reapfs.h"
 #include "input.h"
 
 char input_buffer[512];
