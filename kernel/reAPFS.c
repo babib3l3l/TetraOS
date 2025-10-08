@@ -14,6 +14,26 @@
 #include "utils.h"
 #include "screen.h"
 
+#define REAPFS_MAGIC        0x52414653  /* 'RAFS' ou similaire */
+#define REAPFS_VERSION      1
+#define REAPFS_BLOCK_SIZE   512
+#define REAPFS_MAX_INODES   256
+#define REAPFS_MAX_BLOCKS   4096
+
+
+// Debug helpers
+
+static void checkpoint(const char *s) { print_string(s); print_string("\n"); }
+
+static void print_hex_u(unsigned v) {
+    const char *hex = "0123456789ABCDEF";
+    for (int shift = (sizeof(unsigned)*8 - 4); shift >= 0; shift -= 4) {
+        putchar(hex[(v >> shift) & 0xF]);
+    }
+    print_string("\n");
+}
+
+
 /* Helpers to convert byte offsets to ATA LBAs (512-byte sectors) */
 static int disk_read_bytes(void *buf, uint64_t offset, size_t len) {
     /* ATA API reads sectors (512B) by LBA. We'll round to sector boundaries. */
@@ -206,28 +226,95 @@ static int dir_add(reapfs_inode_t dir, reapfs_inode_t child, const char *name) {
 }
 
 /* Simple FS API implementations */
-
 int fs_init(void) {
-    memset(inode_used,0,sizeof(inode_used));
-    memset(inode_cache,0,sizeof(inode_cache));
-    memset(fd_table,0,sizeof(fd_table));
-    if (load_super() != 0) return FS_ERR;
+    print_string("FS: start");
+
+    memset(inode_used, 0, sizeof(inode_used));
+    print_string("FS: cleared inode_used\n");
+
+    memset(inode_cache, 0, sizeof(inode_cache));
+    print_string("FS: cleared inode_cache\n");
+
+    memset(fd_table, 0, sizeof(fd_table));
+    print_string("FS: cleared fd_table\n");
+
+    print_string("FS: before load_super\n");
+    if (load_super() != 0) {
+        print_string("FS: load_super FAILED\n");
+        
+        memset(&g_super, 0, sizeof(g_super));
+        g_super.magic = REAPFS_MAGIC;
+        /* optionally: other minimal stable fields */
+        if (reapfs_disk_write(&g_super, 0, sizeof(g_super)) != 0) {
+            print_string("FS: reapfs_disk_write(super) FAILED\n");
+            return FS_ERR;
+        }
+        print_string("FS: wrote new super ok\n");
+    } else {
+        print_string("FS: load_super OK\n");
+        
+        if (g_super.magic != REAPFS_MAGIC) {
+            print_string("FS: bad magic\n");
+            return FS_ERR;
+        }
+    }
+
+    print_string("FS: before load_inodes\n");
     if (load_inodes() != 0) {
-        /* if inode table empty, initialize root */
-        for (int i=0;i<REAPFS_MAX_INODES;i++) inode_used[i]=0;
+        print_string("FS: load_inodes failed -> create root\n");
+        
+
+        for (int i = 0; i < REAPFS_MAX_INODES; ++i) inode_used[i] = 0;
+
         reapfs_inode_t r = alloc_inode();
+        print_string("FS: after alloc_inode\n");
+        
+        print_string("alloc_inode returned\n");
+        print_string((unsigned)r);
+        print_string("\n");
+
+        if (r == 0 || r > REAPFS_MAX_INODES) {
+            print_string("FS: alloc_inode INVALID\n");
+            return FS_ERR;
+        }
+
         struct reapfs_inode *ri = get_inode(r);
+        if (!ri) {
+            print_string("FS: get_inode returned NULL\n");
+            print_string((unsigned)r); 
+            print_string("\n");
+            return FS_ERR;
+        }
+        print_string("FS: got inode pointer\n");
+        
+
+        memset(ri, 0, sizeof(*ri));
         ri->mode = 0x4000;
         ri->link_count = 1;
         ri->parent = r;
-        strncpy(ri->name,"/", sizeof(ri->name)-1);
-        /* flush */
-        flush_inodes();
-        /* write super too */
-        reapfs_disk_write(&g_super, 0, sizeof(g_super));
+        strncpy(ri->name, "/", sizeof(ri->name)-1);
+        ri->name[sizeof(ri->name)-1] = '\0';
+
+        if (flush_inodes() != 0) {
+            print_string("FS: flush_inodes failed\n");
+            return FS_ERR;
+        }
+        print_string("FS: flushed inodes\n");
+
+        if (reapfs_disk_write(&g_super, 0, sizeof(g_super)) != 0) {
+            print_string("FS: reapfs_disk_write(super) failed\n");
+            return FS_ERR;
+        }
+        print_string("FS: root created ok\n");
+    } else {
+        print_string("FS: load_inodes OK\n");
     }
+
+    print_string("FS: done\n");
     return FS_OK;
 }
+
+
 
 int fs_mkdir(const char *path) {
     char parent[256], name[256];
