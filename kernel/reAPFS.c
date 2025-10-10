@@ -110,7 +110,7 @@ static uint64_t block_to_offset(uint32_t block) {
     return (uint64_t)block * REAPFS_BLOCK_SIZE;
 }
 
-static int load_super(void) {
+int load_super(void) {
     if (reapfs_disk_read(&g_super, 0, sizeof(g_super)) != 0) return -1;
     if (g_super.magic != REAPFS_MAGIC) {
         /* Assume unformatted - create a default superblock */
