@@ -1,66 +1,120 @@
-
 #ifndef REAPFS_H
 #define REAPFS_H
 
 #include <stdint.h>
 #include <stddef.h>
 
-/* Simple reAPFS on-disk layout constants */
-#define REAPFS_MAGIC 0x52415046u /* 'RAPF' */
-#define REAPFS_BLOCK_SIZE 4096
-#define REAPFS_MAX_INODES 1024
-#define REAPFS_MAX_NAME 64
-#define REAPFS_MAX_FD 16
+/*
+ * reapfs.h — header complet pour le système de fichiers REAPFS (bare-metal)
+ * Version freestanding (aucune dépendance libc)
+ *
+ * Fournit les prototypes publics utilisés par le kernel et le shell.
+ */
 
-typedef uint32_t reapfs_inode_t;
-typedef int32_t reapfs_fd_t;
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-/* on-disk superblock */
+/* === Constantes globales === */
+#define REAPFS_MAGIC        0x52454150  /* "REAP" */
+#define REAPFS_VERSION      1
+#define REAPFS_MAX_INODES   128
+#define REAPFS_MAX_FILENAME 32
+#define FS_OK               0
+#define FS_ERR             -1
+
+/* === Types internes === */
+
+/**
+ * Superblock du système de fichiers
+ */
 struct reapfs_super {
-    uint32_t magic;
-    uint32_t version;
-    uint64_t disk_size_bytes;
-    uint32_t block_size;
-    uint32_t inode_table_blocks;
-    uint32_t data_start_block;
-    uint8_t reserved[32];
+    uint32_t magic;        /* Identifiant du FS */
+    uint32_t version;      /* Version du format */
+    uint32_t inode_count;  /* Nombre d'inodes utilisés */
+    uint32_t block_count;  /* Nombre total de blocs */
 };
 
-/* simple inode on-disk */
+/**
+ * Inode simplifié (fichier ou répertoire)
+ */
 struct reapfs_inode {
-    reapfs_inode_t id;
-    uint16_t mode; /* dir/file */
-    uint16_t link_count;
-    uint64_t size;
-    uint32_t direct_blocks[6];
-    reapfs_inode_t parent;
-    char name[REAPFS_MAX_NAME];
-    uint8_t reserved[32];
+    char name[REAPFS_MAX_FILENAME];  /* Nom du fichier */
+    uint8_t parent;                  /* Index du répertoire parent */
+    uint8_t is_dir;                  /* 1 = dossier, 0 = fichier */
+    uint32_t size;                   /* Taille en octets */
+    uint32_t first_block;            /* Premier bloc de données */
 };
 
-struct reapfs_dir_entry {
-    reapfs_inode_t inode;
-    char name[REAPFS_MAX_NAME];
-};
+/**
+ * Descripteur de fichier (index d'inode ou handle interne)
+ */
+typedef int reapfs_fd_t;
 
-/* Disk IO using ATA - provided by kernel */
-int reapfs_disk_read(void *buf, uint64_t offset, size_t len);
-int reapfs_disk_write(const void *buf, uint64_t offset, size_t len);
+/* === API publique === */
 
-/* High level FS API used by the OS */
+/**
+ * Initialise le FS. Charge le superblock si existant, sinon formate le disque.
+ * Retourne FS_OK si succès, FS_ERR sinon.
+ */
 int fs_init(void);
-int fs_mkdir(const char *path);
+
+/**
+ * Crée un fichier vide avec le nom donné.
+ * Retourne l’inode index (>=0) ou FS_ERR.
+ */
 int fs_create(const char *path);
-reapfs_fd_t fs_open(const char *path, int write);
-int fs_close(reapfs_fd_t fd);
-int fs_write(reapfs_fd_t fd, const void *buf, size_t len);
-int fs_read(reapfs_fd_t fd, void *buf, size_t len);
-int fs_ls(const char *path, char *out_buf, size_t out_sz);
+
+/**
+ * Supprime un fichier du FS (libère son inode).
+ * Retourne FS_OK si succès, FS_ERR sinon.
+ */
 int fs_remove(const char *path);
+
+/**
+ * Crée un répertoire (si non existant).
+ * Retourne FS_OK si succès, FS_ERR sinon.
+ */
+int fs_mkdir(const char *path);
+
+/**
+ * Ouvre un fichier (lecture/écriture selon `write`).
+ * Retourne un descripteur (>=0) ou FS_ERR si échec.
+ */
+reapfs_fd_t fs_open(const char *name, int write);
+
+/**
+ * Lit `sz` octets du fichier référencé par `fd` dans `buf`.
+ * Retourne le nombre d’octets lus ou FS_ERR.
+ */
+int fs_read(reapfs_fd_t fd, void *buf, size_t sz);
+
+/**
+ * Écrit `sz` octets du buffer `buf` dans le fichier `fd`.
+ * Retourne le nombre d’octets écrits ou FS_ERR.
+ */
+int fs_write(reapfs_fd_t fd, const void *buf, size_t sz);
+
+/**
+ * Ferme un fichier (actuellement no-op).
+ * Toujours retourne FS_OK.
+ */
+void fs_close(reapfs_fd_t fd);
+
+/**
+ * Liste le contenu du répertoire donné dans `out` (chaîne texte).
+ * Ex. fs_ls("/", buf, 4096);
+ * Retourne FS_OK si succès, FS_ERR sinon.
+ */
+int fs_ls(const char *path, char *out, size_t out_sz);
+
+/**
+ * Affiche les métadonnées du FS (debug).
+ */
 void fs_debug_print(void);
 
-/* Status codes */
-#define FS_OK 0
-#define FS_ERR -1
-
+#ifdef __cplusplus
+}
 #endif
+
+#endif /* REAPFS_H */

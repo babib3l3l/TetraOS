@@ -1,5 +1,6 @@
 /i686
-/kernel/.vscode
-/kernel/ata.txt
-/kernel/fs.txt
-/kernel/kernel.zip
+/kernel/.vscode/settings.json
+*.zip
+*.o
+*.bin
+*.map

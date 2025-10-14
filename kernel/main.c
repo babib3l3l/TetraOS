@@ -103,6 +103,7 @@ static int fs_mkdir_wrapper(const char* name) {
 
 
 __attribute__((naked)) __attribute__((section(".text.start")))
+
 void start(void) {
     // Tout en 1 block pour éviter les problème de linker ud2
     asm volatile (
@@ -335,7 +336,7 @@ void tetra_shell(void)
         // Afficher le chemin actuel
         char parts[16][32];
         int depth = 0;
-        uint32_t cur = g_cwd_path;
+        uint32_t cur = (uint8_t)g_cwd_path[0];
         
         while (cur != 0 && depth < 16) {
             memset(parts[depth], 0, 32);
