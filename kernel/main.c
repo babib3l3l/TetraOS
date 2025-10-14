@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include "io.h"
 #include "ata.h"
-
+#include "ui.h"
 
 struct reapfs_global {
     struct reapfs_super super;
@@ -133,10 +133,10 @@ void tetra_shell(void);
 
 
 void kmain(void) {
+    clear_screen();
     print_string("ETAPE 1: Debut kmain()\n");
     
     print_string("ETAPE 2: Initialisation ecran\n");
-    clear_screen();
     
     print_string("ETAPE 2: Initialisation ata\n");
     ata_init();
@@ -162,40 +162,7 @@ static void delay_spin(uint32_t loops)
 }
 
 static void draw_train_at(int x) {
-    const char* hyperloop[] = {
-        "      ====        ________                ___________ ",
-        "  _D _|  |_______/        \\\\__I_I_____===__|_________| ",
-        "   |(_)---  |   H\\\\________/ |   |        =|___ ___|   ",
-        "   /     |  |   H  |  |     |   |         ||_| |_||   ",
-        "  |      |  |   H  |__--------------------| [___] |   ",
-        "  | ________|___H__/__|_____/[][]~\\\\_______|       |   ",
-        "  |/ |   |-----------I_____I [][] []  D   |=======|__ ",
-        "__/ =| o |=-~~\\\\  /~~\\\\  /~~\\\\  /~~\\\\ ____Y___________|__ ",
-        " |/-=|___|=    ||    ||    ||    |_____/~\\\\___/        ",
-        "  \\\\_/      \\\\O=====O=====O=====O_/      \\\\_/            ",
-    };  
-    
-    int h = sizeof(hyperloop) / sizeof(hyperloop[0]);
-    for (int pos = 0; pos < 40; pos++) {
-        clear_screen();
-        for (int i = 0; i < h; i++) {
-            for (int sp = 0; sp < pos; sp++) print_char(' ');
-            print_string(hyperloop[i]); 
-            print_char('\n');
-        }
-        delay_spin(6000000);
-    }
-
-    for (int i = 0; i < h; i++) {
-        int col = x;
-        const char* s = hyperloop[i];
-        while (*s) {
-            if (col >= 0 && col < MAX_COLS) print_char(*s);
-            col++;
-            s++;
-        }
-        print_char('\n');
-    }
+print_string("Fonction non disponible en 1.0, desole ...");
 }
 
 
@@ -330,7 +297,8 @@ void tetra_shell(void)
     print_string("Type 'help' for available commands\n\n");
     
     while (1) {
-        // Prompt style Linux
+        fs_draw_ls();
+
         print_string("root@TetraOS:");
         
         // Afficher le chemin actuel
@@ -415,7 +383,9 @@ void tetra_shell(void)
             fs_debug_print();
         }
         else if (strcmp(s, "pwd") == 0) {
-            /* print cwd */ printf("%s\n", g_cwd_path);
+            print_string("Vous etes ici : ");
+            printf(g_cwd_path);
+            print_string("\n");
         }
         else if (strncmp(s, "cd ", 3) == 0) {
             char *path = (char*)(s + 3);

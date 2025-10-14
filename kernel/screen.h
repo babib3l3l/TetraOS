@@ -22,4 +22,8 @@ void update_cursor();
 void print_hex(uint32_t num);
 void print_dec(uint32_t num);
 void print_int(int num);
+void print_xy(int x, int y, const char *text);
+void screen_fill_rect(int x, int y, int w, int h, char c);
+void clear_line(int y);
+int screen_get_width(void);
 #endif

@@ -117,4 +117,21 @@ void fs_debug_print(void);
 }
 #endif
 
+/* Structure minimale visible par l’UI */
+#define MAX_FILENAME     32
+#define MAX_DIR_ENTRIES  32
+
+typedef struct {
+    char name[MAX_FILENAME];
+    uint32_t ino;
+    uint8_t is_dir;
+} fs_entry_t;
+
+/* Liste le contenu du répertoire courant dans un tableau fourni */
+int fs_list_dir(fs_entry_t *entries, int max_entries);
+
+/* Retourne 1 si un inode est un répertoire, 0 sinon */
+int fs_is_dir(uint32_t ino);
+
+
 #endif /* REAPFS_H */

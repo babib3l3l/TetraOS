@@ -750,4 +750,39 @@ const char *fs_get_cwd(void) {
     return g_cwd_path;
 }
 
+/* Renvoie 1 si l’inode est un répertoire, sinon 0 */
+int fs_is_dir(uint32_t ino) {
+    if (ino >= MAX_INODES) return 0;
+    return g_inodes[ino].is_dir ? 1 : 0;
+}
+
+/* Liste le contenu du répertoire courant dans un tableau fs_entry_t */
+int fs_list_dir(fs_entry_t *entries, int max_entries) {
+    if (!entries || max_entries <= 0) return -1;
+
+    // Utiliser le répertoire courant (et non /)
+    int ino = g_cwd_ino;
+    if (ino < 0 || ino >= MAX_INODES) return -1;
+    if (!g_inodes[ino].is_dir) return -1;
+
+    reapfs_dirent_t raw[MAX_DIR_ENTRIES];
+    int bytes = read_file_data(&g_inodes[ino], raw, sizeof(raw));
+    int count = bytes > 0 ? bytes / (int)sizeof(reapfs_dirent_t) : 0;
+
+    int j = 0;
+    for (int i = 0; i < count && j < max_entries; ++i) {
+        if (strcmp(raw[i].name, ".") == 0 || strcmp(raw[i].name, "..") == 0)
+            continue;
+        strncpy(entries[j].name, raw[i].name, MAX_FILENAME - 1);
+        entries[j].name[MAX_FILENAME - 1] = '\0';
+        entries[j].ino = raw[i].ino;
+        entries[j].is_dir = g_inodes[raw[i].ino].is_dir ? 1 : 0;
+        j++;
+    }
+
+    return j; // nombre d'entrées trouvées
+}
+
+
+
 /* fin du fichier */
