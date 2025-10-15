@@ -28,9 +28,9 @@ extern int snprintf(char *str, size_t size, const char *format, ...);
 /* ---------- Configuration FS ---------- */
 #define SECTOR_SIZE 512
 #define MAX_INODES 256
-#define INODE_TABLE_SECTORS 64
-#define SUPERBLOCK_SECTOR 0
-#define INODE_TABLE_START_SECTOR 1
+#define INODE_TABLE_SECTORS 256
+#define SUPERBLOCK_SECTOR 128
+#define INODE_TABLE_START_SECTOR 129
 #define MAX_FILENAME 32
 #define MAX_DIR_ENTRIES 32
 #define MAX_PATH 256

@@ -4,3 +4,5 @@
 *.o
 *.bin
 *.map
+*.elf
+*.img
