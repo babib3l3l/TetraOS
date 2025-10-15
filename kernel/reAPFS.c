@@ -330,7 +330,7 @@ static int read_file_data(reapfs_inode_t *inode, void *buf, uint32_t buf_size) {
  * - out buffer doit avoir taille out_sz (>= MAX_PATH).
  * - retourne 0 ou -1 si erreur.
  */
-static int normalize_path_abs(const char *path_in, char *out, size_t out_sz) {
+int normalize_path_abs(const char *path_in, char *out, size_t out_sz) {
     if (!path_in || !out) return -1;
 
     char tmp[MAX_PATH * 2];
@@ -542,19 +542,28 @@ int fs_init(void) {
 
 /* Create file given a path (creates inode + ajoute au parent) */
 int fs_create(const char *path) {
+    if (!path) return -1;
+
+    char abs[MAX_PATH];
+    if (normalize_path_abs(path, abs, sizeof(abs)) != 0)
+        return -1;
+
     char parent[256];
     char name[MAX_FILENAME];
-    if (split_path(path, parent, name) != 0) return -1;
+    if (split_path(abs, parent, name) != 0)
+        return -1;
 
     int parent_ino = find_inode_by_path(parent);
-    if (parent_ino < 0 || !g_inodes[parent_ino].is_dir) return -1;
+    if (parent_ino < 0 || !g_inodes[parent_ino].is_dir)
+        return -1;
 
-    /* vérifier qu'il n'existe pas déjà */
+    // Vérifie que le fichier n'existe pas déjà
     reapfs_dirent_t entries[MAX_DIR_ENTRIES];
     int bytes = read_file_data(&g_inodes[parent_ino], entries, sizeof(entries));
     int count = bytes > 0 ? bytes / (int)sizeof(reapfs_dirent_t) : 0;
     for (int i = 0; i < count; ++i) {
-        if (strncmp(entries[i].name, name, MAX_FILENAME) == 0) return -1; /* exists */
+        if (strncmp(entries[i].name, name, MAX_FILENAME) == 0)
+            return -1; // existe déjà
     }
 
     int ino = alloc_inode();
@@ -575,12 +584,19 @@ int fs_create(const char *path) {
     return ino;
 }
 
+
 /* Open file by path -> returns inode number as "fd" or -1 */
 reapfs_fd_t fs_open(const char *path, int write) {
     (void)write;
     if (!path) return -1;
-    return find_inode_by_path(path);
+
+    char abs[MAX_PATH];
+    if (normalize_path_abs(path, abs, sizeof(abs)) != 0)
+        return -1;
+
+    return find_inode_by_path(abs);
 }
+
 
 /* Write to file by "fd" (inode number). Returns bytes written or -1 */
 int fs_write(int fd, const void *buf, uint32_t size) {
@@ -603,9 +619,17 @@ void fs_close(reapfs_fd_t fd) {
 
 /* Remove file or empty directory by path */
 int fs_remove(const char *path) {
+    if (!path) return -1;
+
+    char abs[MAX_PATH];
+    if (normalize_path_abs(path, abs, sizeof(abs)) != 0)
+        return -1;
+
     char parent[256];
     char name[MAX_FILENAME];
-    if (split_path(path, parent, name) != 0) return -1;
+    if (split_path(abs, parent, name) != 0)
+        return -1;
+
     int parent_ino = find_inode_by_path(parent);
     if (parent_ino < 0) return -1;
 
@@ -613,27 +637,41 @@ int fs_remove(const char *path) {
     int bytes = read_file_data(&g_inodes[parent_ino], entries, sizeof(entries));
     int count = bytes > 0 ? bytes / (int)sizeof(reapfs_dirent_t) : 0;
     int target = -1;
-    for (int i = 0; i < count; ++i) if (strncmp(entries[i].name, name, MAX_FILENAME) == 0) { target = (int)entries[i].ino; break; }
+
+    for (int i = 0; i < count; ++i)
+        if (strncmp(entries[i].name, name, MAX_FILENAME) == 0)
+            target = (int)entries[i].ino;
+
     if (target < 0) return -1;
 
-    /* si c'est un répertoire, vérifier qu'il est vide (seulement . and .. allowed) */
+    // Vérifie si répertoire vide (hors . et ..)
     if (g_inodes[target].is_dir) {
         reapfs_dirent_t tmp[MAX_DIR_ENTRIES];
         int b = read_file_data(&g_inodes[target], tmp, sizeof(tmp));
         int c = b > 0 ? b / (int)sizeof(reapfs_dirent_t) : 0;
-        /* if only . and .. remain, consider empty */
-        if (c > 2) return -1; /* non vide */
+        if (c > 2) return -1; // non vide
     }
 
-    if (dir_remove_entry((uint32_t)parent_ino, name) != 0) return -1;
+    if (dir_remove_entry((uint32_t)parent_ino, name) != 0)
+        return -1;
+
     free_inode((uint32_t)target);
     save_super();
     return 0;
 }
 
+
 /* List files in path -> prints to console */
 int fs_ls(const char *path, char *out, size_t out_sz) {
-    int ino = find_inode_by_path(path);
+    int ino;
+    char abs[MAX_PATH];
+
+    if (path && path[0])
+        normalize_path_abs(path, abs, sizeof(abs));
+    else
+        strncpy(abs, g_cwd_path, sizeof(abs));
+
+    ino = find_inode_by_path(abs);
     if (ino < 0) return -1;
     if (!g_inodes[ino].is_dir) return -1;
 
@@ -642,31 +680,49 @@ int fs_ls(const char *path, char *out, size_t out_sz) {
     int count = bytes > 0 ? bytes / (int)sizeof(reapfs_dirent_t) : 0;
 
     print_string("FS: listing ");
-    print_string(path ? path : g_cwd_path);
+    print_string(abs);
     print_string("\n");
 
     for (int i = 0; i < count; ++i) {
+        // 🔽 Ignorer . et ..
+        if (strcmp(entries[i].name, ".") == 0 || strcmp(entries[i].name, "..") == 0)
+            continue;
+
         print_string(" - ");
         print_string(entries[i].name);
-        if (g_inodes[entries[i].ino].is_dir) print_string("/\n"); else print_string("\n");
+        if (g_inodes[entries[i].ino].is_dir)
+            print_string("/\n");
+        else
+            print_string("\n");
     }
     return 0;
 }
 
+
 /* mkdir : crée un répertoire hiérarchique (avec . et ..) */
 int fs_mkdir(const char *path) {
+    if (!path) return -1;
+
+    char abs[MAX_PATH];
+    if (normalize_path_abs(path, abs, sizeof(abs)) != 0)
+        return -1;
+
     char parent[256];
     char name[MAX_FILENAME];
-    if (split_path(path, parent, name) != 0) return -1;
+    if (split_path(abs, parent, name) != 0)
+        return -1;
 
     int parent_ino = find_inode_by_path(parent);
-    if (parent_ino < 0 || !g_inodes[parent_ino].is_dir) return -1;
+    if (parent_ino < 0 || !g_inodes[parent_ino].is_dir)
+        return -1;
 
-    /* vérifier non existant */
+    // Vérifie que le répertoire n'existe pas déjà
     reapfs_dirent_t entries[MAX_DIR_ENTRIES];
     int bytes = read_file_data(&g_inodes[parent_ino], entries, sizeof(entries));
     int count = bytes > 0 ? bytes / (int)sizeof(reapfs_dirent_t) : 0;
-    for (int i = 0; i < count; ++i) if (strncmp(entries[i].name, name, MAX_FILENAME) == 0) return -1;
+    for (int i = 0; i < count; ++i)
+        if (strncmp(entries[i].name, name, MAX_FILENAME) == 0)
+            return -1;
 
     int ino = alloc_inode();
     if (ino < 0) return -1;
@@ -675,27 +731,26 @@ int fs_mkdir(const char *path) {
     node->is_dir = 1;
     strncpy(node->name, name, MAX_FILENAME - 1);
     node->name[MAX_FILENAME - 1] = '\0';
-    node->size = 0; /* empty dir initially */
+    node->size = 0;
 
-    /* Ajout automatique des entrées . et .. (écrire d'abord la table de dirent pour ce répertoire) */
-    {
-        reapfs_dirent_t init_entries[2];
-        strncpy(init_entries[0].name, ".", MAX_FILENAME - 1);
-        init_entries[0].name[MAX_FILENAME - 1] = '\0';
-        init_entries[0].ino = (uint32_t)ino;
-        strncpy(init_entries[1].name, "..", MAX_FILENAME - 1);
-        init_entries[1].name[MAX_FILENAME - 1] = '\0';
-        init_entries[1].ino = (uint32_t)parent_ino;
-        if (write_file_data(node, init_entries, (uint32_t)sizeof(init_entries)) != 0) {
-            free_inode((uint32_t)ino);
-            return -1;
-        }
-        node->size = (uint32_t)sizeof(init_entries);
+    // Initialise les entrées . et ..
+    reapfs_dirent_t init_entries[2];
+    strncpy(init_entries[0].name, ".", MAX_FILENAME - 1);
+    init_entries[0].name[MAX_FILENAME - 1] = '\0';
+    init_entries[0].ino = (uint32_t)ino;
+
+    strncpy(init_entries[1].name, "..", MAX_FILENAME - 1);
+    init_entries[1].name[MAX_FILENAME - 1] = '\0';
+    init_entries[1].ino = (uint32_t)parent_ino;
+
+    if (write_file_data(node, init_entries, (uint32_t)sizeof(init_entries)) != 0) {
+        free_inode((uint32_t)ino);
+        return -1;
     }
 
-    /* maintenant ajouter l'entrée dans le parent */
+    node->size = (uint32_t)sizeof(init_entries);
+
     if (dir_add_entry((uint32_t)parent_ino, name, (uint32_t)ino) != 0) {
-        /* rollback : supprimer inode créé */
         free_inode((uint32_t)ino);
         return -1;
     }
@@ -704,6 +759,7 @@ int fs_mkdir(const char *path) {
     print_string("FS: mkdir ok\n");
     return ino;
 }
+
 
 /* debug print */
 void fs_debug_print(void) {

@@ -77,6 +77,9 @@ int fs_remove(const char *path);
  */
 int fs_mkdir(const char *path);
 
+// normalise le chemin pour des utilisations comme dans fs_ls ...
+normalize_path_abs(const char *path_in, char *out, size_t out_sz);
+
 /**
  * Ouvre un fichier (lecture/écriture selon `write`).
  * Retourne un descripteur (>=0) ou FS_ERR si échec.
