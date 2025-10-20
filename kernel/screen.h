@@ -26,4 +26,5 @@ void print_xy(int x, int y, const char *text);
 void screen_fill_rect(int x, int y, int w, int h, char c);
 void clear_line(int y);
 int screen_get_width(void);
+void screen_init(void);
 #endif

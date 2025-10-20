@@ -2,6 +2,7 @@
     "files.associations": {
         "stddef.h": "c",
         "input.h": "c",
-        "reapfs.h": "c"
+        "reapfs.h": "c",
+        "image_data.h": "c"
     }
 }

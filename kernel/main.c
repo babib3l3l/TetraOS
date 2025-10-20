@@ -132,25 +132,6 @@ void windowed_write(const char* filename);
 void tetra_shell(void);
 
 
-void kmain(void) {
-    clear_screen();
-    print_string("ETAPE 1: Debut kmain()\n");
-    
-    print_string("ETAPE 2: Initialisation ecran\n");
-    
-    print_string("ETAPE 2: Initialisation ata\n");
-    ata_init();
-
-    print_string("ETAPE 4: Initialisation fichiersystem\n");
-    fs_init();
-    
-    print_string("ETAPE 5: Lancement shell\n");
-    tetra_shell();  // ← Si crash ici, c'est le shell
-    
-    print_string("ETAPE 6: Retour shell (anormal)\n");
-    while(1) { asm volatile ("nop"); }
-}
-
 // --- Fonctions existantes ---
 static void delay_spin(uint32_t loops) 
 { 
@@ -287,6 +268,30 @@ void windowed_write(const char* filename)
     // Effacer la fenêtre
     clear_screen();
 }
+
+void kmain(void) {
+
+    screen_init();
+    clear_screen();
+
+    print_string("Kernel started: screen initialized\n");
+    print_string("ETAPE 1: Debut kmain()\n");
+    
+    print_string("ETAPE 2: Initialisation ecran\n");
+    
+    print_string("ETAPE 2: Initialisation ata\n");
+    ata_init();
+
+    print_string("ETAPE 4: Initialisation fichiersystem\n");
+    fs_init();
+    
+    print_string("ETAPE 5: Lancement shell\n");
+    tetra_shell();  // ← Si crash ici, c'est le shell
+    
+    print_string("ETAPE 6: Retour shell (anormal)\n");
+    while(1) { asm volatile ("nop"); }
+}
+
 
 // --- Shell Style Linux ---
 void tetra_shell(void) 
