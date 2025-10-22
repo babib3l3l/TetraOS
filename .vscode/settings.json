@@ -3,6 +3,7 @@
         "stddef.h": "c",
         "input.h": "c",
         "reapfs.h": "c",
-        "image_data.h": "c"
+        "image_data.h": "c",
+        "stdint.h": "c"
     }
 }

@@ -1,30 +1,26 @@
-#ifndef SCREEN_H
-#define SCREEN_H
+// screen_fb.h
+#ifndef SCREEN_FB_H
+#define SCREEN_FB_H
 
 #include <stdint.h>
+#include <stddef.h>
 
-#define VIDEO_ADDRESS 0xB8000
-#define MAX_ROWS 25
-#define MAX_COLS 80
-#define WHITE_ON_BLACK 0x0F
+/* Initialise le framebuffer à partir de l'adresse du VBE Mode Info Block (physique). 
+   Retourne 0 si OK, non-0 en erreur. */
+int fb_init(uint32_t vbe_mode_info_phys_addr);
 
-// Position du curseur
-extern int cursor_row;
-extern int cursor_col;
+/* Résolution et format lus après init */
+uint32_t fb_width(void);
+uint32_t fb_height(void);
+uint32_t fb_pitch(void);     /* bytes per scanline */
+uint32_t fb_bpp(void);       /* bits per pixel */
 
-void draw_box(int x1, int y1, int x2, int y2);
-void clear_area(int x1, int y1, int x2, int y2);
-void clear_screen();
-void print_char(char c);
-void print_string(const char* str);
-void set_cursor(int row, int col);
-void update_cursor();
-void print_hex(uint32_t num);
-void print_dec(uint32_t num);
-void print_int(int num);
-void print_xy(int x, int y, const char *text);
-void screen_fill_rect(int x, int y, int w, int h, char c);
-void clear_line(int y);
-int screen_get_width(void);
-void screen_init(void);
+/* Primitives */
+void fb_putpixel(uint32_t x, uint32_t y, uint32_t color); /* color = 0xAARRGGBB ou format selon bpp */
+void fb_clear(uint32_t color);
+void fb_fill_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t color);
+
+/* helper for ARGB input */
+void fb_putpixel_argb(uint32_t x, uint32_t y, uint8_t r, uint8_t g, uint8_t b);
+
 #endif

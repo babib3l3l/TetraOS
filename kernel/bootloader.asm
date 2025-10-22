@@ -1,14 +1,15 @@
-; bootloader_fixed.asm
-; Assemble: nasm -f bin bootloader_fixed.asm -o bootloader_fixed.bin
+; bootloader_debug_fixed.asm
+; Assemble: nasm -f bin bootloader_debug_fixed.asm -o bootloader_debug_fixed.bin
 [BITS 16]
 [ORG 0x7C00]
 
-%define KERNEL_LOAD_ADDR 0x00010000   ; 64 KiB
-%define KERNEL_SECTORS   40           ; ajuster selon taille réelle
+%define KERNEL_LOAD_ADDR 0x00010000   ; 64 KiB (linker)
 %define DISK             0x80
 %define VESA_MODE        0x118
-%define DAP_ADDR         0x7C80
+%define DAP_ADDR         0x0200       ; éviter d’écraser le bootloader
 %define VBE_INFO_ADDR    0x07A00
+%define KERNEL_SECTORS   16250
+%define CHUNK_MAX        127
 
 start:
     cli
@@ -21,57 +22,101 @@ start:
     mov si, boot_msg
     call print_string
 
-    ; --- Obtenir infos VBE ---
+    ; --- VBE ---
     mov ax, 0x4F01
     mov cx, VESA_MODE
     mov di, VBE_INFO_ADDR
     int 0x10
 
-    ; --- Activer le mode VESA ---
     mov ax, 0x4F02
     mov bx, 0x4000 | VESA_MODE
     int 0x10
     cmp ax, 0x004F
-    jne .no_vesa
-    mov si, vesa_ok_msg
+    jne .vesa_fail
+    mov si, vesa_ok
     call print_string
-    jmp .load_kernel
-.no_vesa:
-    mov si, vesa_fail_msg
+    jmp .after_vesa
+.vesa_fail:
+    mov si, vesa_fail
     call print_string
+.after_vesa:
 
-.load_kernel:
-    ; --- Construire DAP ---
+    call enable_a20_port92
+
     xor ax, ax
     mov ds, ax
-    mov si, DAP_ADDR
 
+    mov dword [total_read], 0
+    mov dword [remaining], KERNEL_SECTORS
+    mov dword [lba_low], 1
+    mov dword [buffer_phys], KERNEL_LOAD_ADDR
+
+.read_loop:
+    cmp dword [remaining], 0
+    je .done_loading
+
+    mov eax, [remaining]
+    cmp eax, CHUNK_MAX
+    jle .use_remaining
+    mov eax, CHUNK_MAX
+.use_remaining:
+    mov [chunk_size], eax
+
+    mov si, DAP_ADDR
     mov byte [si+0], 0x10
-    mov byte [si+1], 0
-    mov word [si+2], KERNEL_SECTORS
-    mov word [si+4], 0x0000
-    mov word [si+6], (KERNEL_LOAD_ADDR >> 4)
-    mov dword [si+8], 1
+    mov byte [si+1], 0x00
+    mov word [si+2], ax
+
+    mov eax, [buffer_phys]
+    mov ebx, eax
+    and ebx, 0x0000000F
+    mov word [si+4], bx
+    shr eax, 4
+    mov word [si+6], ax
+
+    mov eax, [lba_low]
+    mov [si+8], eax
     mov dword [si+12], 0
 
     mov ah, 0x42
     mov dl, DISK
+    mov si, DAP_ADDR
     int 0x13
-    jc .disk_error
+    jc disk_fail
 
-    mov si, load_ok_msg
+    mov eax, [remaining]
+    sub eax, [chunk_size]
+    mov [remaining], eax
+
+    mov eax, [lba_low]
+    add eax, [chunk_size]
+    mov [lba_low], eax
+
+    mov eax, [chunk_size]
+    mov ecx, 512
+    mul ecx
+    add [buffer_phys], eax
+
+    mov eax, [total_read]
+    add eax, [chunk_size]
+    mov [total_read], eax
+
+    jmp .read_loop
+
+.done_loading:
+    mov si, load_ok
     call print_string
 
-    ; --- GDT ---
     lgdt [gdt_descriptor]
 
     mov eax, cr0
     or eax, 1
     mov cr0, eax
-    jmp 0x08:protected_entry
+
+    jmp 0x08:pm_entry
 
 [BITS 32]
-protected_entry:
+pm_entry:
     mov ax, 0x10
     mov ds, ax
     mov es, ax
@@ -81,16 +126,17 @@ protected_entry:
     mov esp, 0x90000
 
     mov eax, VBE_INFO_ADDR
+
     push dword 0x00010000
     push dword 0x08
     retf
 
-.disk_error:
-    mov si, disk_error_msg
+disk_fail:
+    mov si, disk_err
     call print_string
     cli
     hlt
-    jmp .disk_error
+    jmp disk_fail
 
 print_string:
     pusha
@@ -105,22 +151,38 @@ print_string:
     popa
     ret
 
-; ---------------- GDT ----------------
+enable_a20_port92:
+    in al, 0x92
+    or al, 00000010b
+    out 0x92, al
+    ret
+
 gdt_start:
-    dq 0x0000000000000000
-    dq 0x00CF9A000000FFFF
-    dq 0x00CF92000000FFFF
+    dw 0x0000, 0x0000
+    db 0x00, 0x00, 0x00, 0x00
+
+    dw 0xFFFF, 0x0000
+    db 0x00, 10011010b, 11001111b, 0x00
+
+    dw 0xFFFF, 0x0000
+    db 0x00, 10010010b, 11001111b, 0x00
 gdt_end:
 
 gdt_descriptor:
     dw gdt_end - gdt_start - 1
     dd gdt_start
 
-boot_msg        db "Bootloader: demarrage...",0
-vesa_ok_msg     db "VESA ok",0
-vesa_fail_msg   db "VESA fail",0
-load_ok_msg     db "Kernel charge a 0x10000",0
-disk_error_msg  db "Erreur lecture disque",0
+boot_msg      db "Bootloader: demarrage...",0
+vesa_ok       db "VESA ok",0
+vesa_fail     db "VESA non dispo",0
+load_ok       db "Kernel charge a 0x10000",0
+disk_err      db "Erreur lecture disque",0
 
-times 510 - ($-$$) db 0
+chunk_size   dd 0
+total_read   dd 0
+remaining    dd 0
+lba_low      dd 0
+buffer_phys  dd 0
+
+times 510 - ($ - $$) db 0
 dw 0xAA55

@@ -122,6 +122,24 @@ void start(void) {
         "hlt\n"                  // Si retour
         "jmp .\n"                // Boucle sécurité
     );
+    uint32_t vbe_mode_info_addr;
+    /* récupérer EAX laissé par le bootloader */
+    asm volatile ("mov %0, eax" : "=r"(vbe_mode_info_addr));
+
+    if (vbe_mode_info_addr != 0) {
+        int r = fb_init(vbe_mode_info_addr);
+        if (r == 0) {
+            /* ok : on a accès à framebuffer */
+            fb_clear(0x000000); /* noir */
+            /* exemple : dessiner un rectangle */
+            fb_fill_rect(10, 10, 200, 50, 0x00FF00); /* vert */
+        } else {
+            /* fallback / log d'erreur */
+            /* tu peux utiliser l'affichage texte VGA ici en fallback si nécessaire */
+        }
+    } else {
+        /* bootloader n'a pas fourni d'info VBE -> fallback */
+    }
 }
 
 // Message dans la section .rodata
@@ -148,11 +166,7 @@ print_string("Fonction non disponible en 1.0, desole ...");
 
 
 static void cmd_sl(void) {
-    for (int pos = -70; pos < MAX_COLS; pos++) {
-        clear_screen();
-        draw_train_at(pos);
-        delay_spin(4000000);
-    }
+print_string("pas encore dispo");
 }
 
 
