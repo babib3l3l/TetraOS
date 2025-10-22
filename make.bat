@@ -82,7 +82,8 @@ echo Lancement de QEMU...
     -m 64M ^
     -serial stdio ^
     -display sdl ^
-    -d guest_errors
+    -d guest_errors ^
+    -D QemuLog.txt
 goto end
 
 :error
